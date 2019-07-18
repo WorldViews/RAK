@@ -1,20 +1,21 @@
 // Class for 2D visualization for Kinect skeletons
 
 class CanvasTool {
-    constructor(canvas){
-        console.log('Creating CanvasApp');
-        this.canvas = canvas;
+    constructor(canvasName) {
+        canvasName = canvasName || "canvas";
+        console.log('Creating CanvasTool', canvasName);
+        this.canvas = document.getElementById(canvasName);
+        if (!this.canvas) {
+            alert("No canvas named "+canvasName);
+            return;
+        }
         //this.elements = elements;
-        this.elements = {};
-        this.listenerId = null;
-        this.sx = 0.2;
-        this.sy = 0.2;
-        this.tx = 1200;
+        this.graphics = {};
+        this.sx = 1;
+        this.sy = 1;
+        this.tx = 0;
         this.ty = 0;
-
-        // Object.keys(object).length;
-
-        this.context = this.canvas.getContext('2d');
+        this.context = this.canvas
     }
 
     zoom(zf) {
@@ -24,33 +25,24 @@ class CanvasTool {
     }
 
     draw(){
-        var ctx = this.context;
+        var ctx = this.canvas.getContext('2d');
+        var canvas = this.canvas;
         ctx.resetTransform();
-        this.context.globalAlpha = 1;
-        this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.globalAlpha = 1;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        this.context.lineWidth = 5;
-        this.context.strokeStyle = '#bbb';
-        this.context.strokeRect(0, 0, canvas.width, canvas.height);
+        ctx.lineWidth = 5;
+        ctx.strokeStyle = '#bbb';
+        ctx.strokeRect(0, 0, canvas.width, canvas.height);
 
         ctx.scale(this.sx, this.sy);
         ctx.translate(this.tx, this.ty);
-        for (var id in this.elements){
+        for (var id in this.graphics){
             //console.log("draw id", id);
-            var element = this.elements[id];
-            //let icon = document.getElementById(this.elements[id].icon);
-            if (element !== undefined)
+            var graphics = this.graphics[id];
+            if (graphics !== undefined)
             {
-                /*
-                let radiusInPixels = this.elements[id].radius * this.canvas.width;
-                let x = this.elements[id].x * this.canvas.width - radiusInPixels;
-                let y = this.elements[id].y * this.canvas.height - radiusInPixels;
-                this.context.globalAlpha = this.elements[id].alpha;
-                this.context.drawImage(
-                icon, x, y, radiusInPixels * 2, radiusInPixels * 2);
-                console.log('id', id,"x", x, "y", y, "radiusInPixels", radiusInPixels);
-                */
-               element.draw(this.canvas, ctx);
+                graphics.draw(canvas, ctx);
             }
         }
     }
@@ -68,61 +60,79 @@ class CanvasTool {
     }
 
     setXY(id, x, y){
-        this.elements[id].x = x;
-        this.elements[id].y = y;
+        this.graphics[id].x = x;
+        this.graphics[id].y = y;
         this.draw();
     }
 
-    getElement(id) {
-        return this.elements[id];
+    getGraphic(id) {
+        return this.graphics[id];
     }
 
-    getNumElements() {
-        return Object.keys(this.elements).length;
+    getNumGraphics() {
+        return Object.keys(this.graphics).length;
     }
 
-    addElement(element){
-        this.elements[element.id] = element;       
+    addGraphic(graphic){
+        this.graphics[graphic.id] = graphic;       
     }
 
-    removeElement(id){
-
-        if (id == this.getListenerId()){
-            this.setListenerId(null);
-        }
-        console.log('removing element with id ' + id);
-        delete this.elements[id];
+    removeGraphic(id) {
+        console.log('removing graphic with id ' + id);
+        delete this.graphics[id];
         this.draw();
     }
 
-    setListenerId(id){
-        this.listenerId = id;
+    tick() {
+        console.log("tick...");
+        this.draw();
     }
 
-    getListenerId(){
-        return this.listenerId;
+    start() {
+        this.tick();
+        let inst = this;
+        setInterval(() => inst.tick(), 1000);
     }
 
-    updateIcon(id){
-        this.elements[id].icon = document.getElementById(this.elements[id].iconName);
-    }
-   
 }
 
-CanvasTool.Element = class {
-    constructor(id, iconName, x,y){
+CanvasTool.Graphic = class {
+    constructor(id, x, y) {
+        this.id = id;
+        this.x =x;
+        this.y = y;
+        this.lineWidth = 1;
+        this.strokeStyle = '#000';
+        this.fillStyle = '#900';
+        this.radius = 10; 
+        this.alpha = 0.333;
+        this.clickable =  false;
+    }
+
+    draw(canvas, ctx) {
+        let r = this.radius;
+        let x = this.x;
+        let y = this.y;
+        ctx.lineWidth = this.lineWidth;
+        ctx.strokeStyle = this.strokeStyle;
+        ctx.fillStyle = this.fillStyle;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.stroke();
+    }
+}
+
+CanvasTool.IconGraphic = class extends CanvasTool.Graphic {
+    constructor(id, iconName, x,y) {
+        super(id, x, y);
         this.iconName = iconName;
         this.icon = document.getElementById(iconName);
         if (!this.icon) {
             alert("Unable to get icon " + iconName);
         }
-        this.id = id;
-        this.x =x;
-        this.y = y;
         this.radius = 0.04; 
         this.alpha = 0.333;
-        this.clickable =  false;
-
     }
 
     draw(canvas, ctx) {
@@ -131,26 +141,6 @@ CanvasTool.Element = class {
         let y = this.y * canvas.height - radiusInPixels;
         ctx.drawImage(
             this.icon, x, y, radiusInPixels * 2, radiusInPixels * 2);
-            //console.log('id', this.id,"x", x, "y", y, "radiusInPixels", radiusInPixels);
-    }
-
-}
-
-CanvasTool.CameraElement = class extends CanvasTool.Element {
-    constructor(id, x, y) {
-        super(id, 'cameraIcon', x, y);
-    }
-}
-
-CanvasTool.ListenerElement = class extends CanvasTool.Element {
-    constructor(id, x, y) {
-        super(id, 'listenerIcon', x, y);
-    }
-}
-
-CanvasTool.SourceElement = class extends CanvasTool.Element {
-    constructor(id, x, y) {
-        super(id, 'sourceIcon', x, y);
     }
 }
 

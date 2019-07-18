@@ -4,14 +4,19 @@
         <script src="js/libs/jquery-3.1.0.min.js"></script>
         <script src="js/libs/sprintf.js"></script>
         <script src="js/CanvasTool.js"></script>
+        <script src="js/RAK.js"></script>
     </head>
     <body>
         <h1>Welcome to RAK</h1>
-        <canvas id="canvas1"></canvas>
+        <canvas id="canvas1" width=600 height=600></canvas>
 
         <script>
+            var rak = null;
+
             $(document).ready(() =>{
                 console.log("started");
+                rak = new RAKTool("canvas1");
+                rak.start();
             })
         </script>
     </body>
