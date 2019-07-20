@@ -1,5 +1,11 @@
 // Class for 2D visualization for Kinect skeletons
 
+function dist(a1,a2) {
+    var dx = a2.x - a1.x;
+    var dy = a2.y - a1.y;
+    return Math.sqrt(dx*dx + dy*dy);
+}
+
 class CanvasTool {
     constructor(canvasName) {
         canvasName = canvasName || "canvas";
@@ -15,17 +21,22 @@ class CanvasTool {
         this.init();
         this.setupGUIBindings();
     }
-    
+
     setupGUIBindings() {
         var inst = this;
 
         this.canvas.addEventListener("mousedown", e=> {
+            var hit = this.getHit(e);
+            if (hit) {
+                hit.onClick(e);
+            }
             inst.mouseDownPt = {x: e.clientX, y: e.clientY};
             inst.mouseDownTrans = {tx: inst.tx, ty: inst.ty};
-            console.log("down", e, this.mouseDownPt);
+            //console.log("down", e, this.mouseDownPt);
         });
         this.canvas.addEventListener("mousemove", e=> {
             if (inst.mouseDownPt == null) {
+                 inst.mouseOver(e);
                 return;
             }
             var tr = inst.mouseDownTrans;
@@ -34,11 +45,11 @@ class CanvasTool {
             inst.tx = tr.tx + dx;
             inst.ty = tr.ty + dy;
             //inst.pan(dx,dy);
-            console.log("move", e);
+            //console.log("move", e);
         });
         this.canvas.addEventListener("mouseup", e=> {
             inst.mouseDownPt = null;
-            console.log("up", e);
+            //console.log("up", e);
         });
         this.canvas.addEventListener("wheel", e => {
             //console.log("mousewheel", e);
@@ -48,6 +59,42 @@ class CanvasTool {
                 inst.zoom(1/inst.zf);
         });
     }
+
+    getMousePosCanv(e) {
+        var rect = this.canvas.getBoundingClientRect();
+        return {
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top
+        };
+    }
+
+    getMousePos(e) {
+        var pt = this.getMousePosCanv(e);
+        return {x: pt.x / this.sx + this.tx,
+                y: pt.y / this.sy + this.ty};
+    }
+
+    mouseOver(e) {
+        var pt = this.getMousePos(e);
+        //console.log("mouseOver", pt);
+        for (var id in this.graphics) {
+            var g = this.graphics[id];
+            if (g.contains(pt))
+                console.log("Over id", id);
+        }    
+    }
+
+    getHit(e) {
+        var pt = this.getMousePos(e);
+        //console.log("mouseOver", pt);
+        for (var id in this.graphics) {
+            var g = this.graphics[id];
+            if (g.contains(pt))
+                return g;
+        }
+        return null;
+    }
+
 
     init() {
         this.graphics = {};
@@ -182,6 +229,18 @@ CanvasTool.Graphic = class {
         ctx.arc(x, y, r, 0, 2 * Math.PI);
         ctx.fill();
         ctx.stroke();
+    }
+
+    contains(pt) {
+        var d = dist(this, pt);
+        //console.log("contains", this.id, d, this.x, this.y, pt, this.radius);
+        var v = d <= this.radius;
+        //console.log("v", v);
+        return v;
+    }
+
+    onClick(e) {
+        console.log("Graphic.onClick", this.id, e);
     }
 }
 

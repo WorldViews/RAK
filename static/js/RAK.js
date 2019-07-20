@@ -9,6 +9,12 @@ class Actor extends CanvasTool.Graphic {
         this.happiness = 0.5;
     }
 
+    onClick(e) {
+        this.happiness = 0;
+        if (e.shiftKey)
+            this.happiness = 1;
+    }
+
     adjustPosition() {
         if (0) {
             var s = 6;
@@ -27,7 +33,7 @@ class Actor extends CanvasTool.Graphic {
     }
 
     adjustState() {
-        var s = 2;
+        var s = .1;
         this.happiness += s*(Math.random() - 0.5);
         if (this.happiness > .8)
             this.fillStyle = "#0a0";
