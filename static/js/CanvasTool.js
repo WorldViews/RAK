@@ -10,12 +10,52 @@ class CanvasTool {
             return;
         }
         //this.elements = elements;
+        this.mouseDownPt = null;
+        this.mouseDownTrans = null;
+        this.init();
+        this.setupGUIBindings();
+    }
+    
+    setupGUIBindings() {
+        var inst = this;
+
+        this.canvas.addEventListener("mousedown", e=> {
+            inst.mouseDownPt = {x: e.clientX, y: e.clientY};
+            inst.mouseDownTrans = {tx: inst.tx, ty: inst.ty};
+            console.log("down", e, this.mouseDownPt);
+        });
+        this.canvas.addEventListener("mousemove", e=> {
+            if (inst.mouseDownPt == null) {
+                return;
+            }
+            var tr = inst.mouseDownTrans;
+            var dx = e.clientX - inst.mouseDownPt.x;
+            var dy = e.clientY - inst.mouseDownPt.y;
+            inst.tx = tr.tx + dx;
+            inst.ty = tr.ty + dy;
+            //inst.pan(dx,dy);
+            console.log("move", e);
+        });
+        this.canvas.addEventListener("mouseup", e=> {
+            inst.mouseDownPt = null;
+            console.log("up", e);
+        });
+        this.canvas.addEventListener("wheel", e => {
+            //console.log("mousewheel", e);
+            if (e.deltaY > 0)
+                inst.zoom(inst.zf);
+            else
+                inst.zoom(1/inst.zf);
+        });
+    }
+
+    init() {
         this.graphics = {};
         this.sx = 1;
         this.sy = 1;
         this.tx = 0;
         this.ty = 0;
-        this.context = this.canvas
+        this.zf = .99;
     }
 
     zoom(zf) {
@@ -24,7 +64,12 @@ class CanvasTool {
         this.sy *= zf;
     }
 
-    draw(){
+    pan(dx,dy) {
+        this.tx += dx;
+        this.ty += dy;
+    }
+
+    clearCanvas() {
         var ctx = this.canvas.getContext('2d');
         var canvas = this.canvas;
         ctx.resetTransform();
@@ -34,7 +79,19 @@ class CanvasTool {
         ctx.lineWidth = 5;
         ctx.strokeStyle = '#bbb';
         ctx.strokeRect(0, 0, canvas.width, canvas.height);
+    }
 
+    setTransform(ctx) {
+        ctx.resetTransform();
+        ctx.scale(this.sx, this.sy);
+        ctx.translate(this.tx, this.ty);
+    }
+
+    drawGraphics() {
+        var ctx = this.canvas.getContext('2d');
+        this.setTransform(ctx);
+        var canvas = this.canvas;
+        ctx.resetTransform();
         ctx.scale(this.sx, this.sy);
         ctx.translate(this.tx, this.ty);
         for (var id in this.graphics){
@@ -45,6 +102,11 @@ class CanvasTool {
                 graphics.draw(canvas, ctx);
             }
         }
+    }
+
+    draw() {
+        this.clearCanvas();
+        this.drawGraphics();
     }
 
     resize(){
@@ -104,7 +166,7 @@ CanvasTool.Graphic = class {
         this.lineWidth = 1;
         this.strokeStyle = '#000';
         this.fillStyle = '#900';
-        this.radius = 10; 
+        this.radius = 5; 
         this.alpha = 0.333;
         this.clickable =  false;
     }
