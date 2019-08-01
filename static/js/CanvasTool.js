@@ -218,6 +218,9 @@ CanvasTool.Graphic = class {
         this.clickable =  false;
     }
 
+    tick() {
+    }
+    
     draw(canvas, ctx) {
         let r = this.radius;
         let x = this.x;

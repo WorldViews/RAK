@@ -9,6 +9,9 @@ class Actor extends CanvasTool.Graphic {
         this.happiness = 0.5;
     }
 
+    tick() {
+    }
+
     onClick(e) {
         this.happiness = 0;
         if (e.shiftKey)
@@ -43,6 +46,45 @@ class Actor extends CanvasTool.Graphic {
     }
 }
 
+class Interaction extends CanvasTool.Graphic {
+    constructor(id, ids) {
+        super(id, 0, 0);
+        this.ids = ids;
+        this.startGen = tool.stepNum;
+    }
+
+    tick() {
+        var dn = tool.stepNum - this.startGen;
+        if (dn > 200) {
+            this.destroy();
+        }
+    }
+
+    destroy() {
+        tool.removeGraphic(this.id);
+        delete tool.interactions[this.id];
+    }
+
+    draw(canvas, ctx) {
+        console.log("Link.draw");
+        ctx.lineWidth = this.lineWidth;
+        ctx.strokeStyle = this.strokeStyle;
+        ctx.fillStyle = this.fillStyle;
+        var inst = this;
+        ctx.beginPath();
+        inst.ids.forEach(id1 => {
+            inst.ids.forEach(id2 => {
+                var a1 = tool.getGraphic(id1);
+                var a2 = tool.getGraphic(id2);
+                ctx.moveTo(a1.x, a1.y);
+                ctx.lineTo(a2.x, a2.y);                 
+            })
+        })
+        ctx.fill();
+        ctx.stroke();
+    }
+}
+
 class Link extends CanvasTool.Graphic {
     constructor(id, id1, id2) {
         super(id, 0, 0);
@@ -51,16 +93,16 @@ class Link extends CanvasTool.Graphic {
     }
 
     draw(canvas, ctx) {
-        console.log("Link.draw");
+        //console.log("Link.draw");
         var a1 = tool.getGraphic(this.id1);
         var a2 = tool.getGraphic(this.id2);
         ctx.lineWidth = this.lineWidth;
         ctx.strokeStyle = this.strokeStyle;
         ctx.fillStyle = this.fillStyle;
-       ctx.beginPath();
-       ctx.moveTo(a1.x, a1.y);
-       ctx.lineTo(a2.x, a2.y);
-       ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(a1.x, a1.y);
+        ctx.lineTo(a2.x, a2.y);
+        ctx.fill();
         ctx.stroke();
     }
 }
@@ -71,7 +113,7 @@ class RAKTool extends CanvasTool {
     constructor(canvasName) {
         super(canvasName);
         this.distThresh = 50;
-        this.numAgents = 500;
+        this.numAgents = 20;
         this.grid = true;
         this.mobile = true;
         tool = this;
@@ -119,12 +161,22 @@ class RAKTool extends CanvasTool {
     }
 
     init() {
+        tool = this;
         super.init();
+        this.stepNum = 0;
         this.numActors = 0;
         this.numLinks = 0;
         this.actors = {};
         this.links = {};
+        this.interactions = {};
         this.initPositions();
+        this.initInteractions();
+    }
+
+    initInteractions() {
+        var int1 = new Interaction("i1", [0,1,2,3]);
+        this.interactions["i1"] = int1;
+        this.addGraphic(int1);
     }
 
     initPositions() {
@@ -211,13 +263,29 @@ class RAKTool extends CanvasTool {
         super.drawGraphics();
     }
 
+    getNumActors() {
+        return Object.keys(this.actors).length;
+    }
+
+    getNumInteractions() {
+        return Object.keys(this.interactions).length;
+    }
+
     tick() {
         //console.log("tick...");
+        this.stepNum++;
         if (this.mobile)
             this.adjustPositions();
         this.adjustStates();
         this.computeLinks(this.distThresh);
         this.draw();
+        for (var id in this.actors)
+            this.actors[id].tick();
+         for (var id in this.interactions)
+            this.interactions[id].tick();
+        var str = sprintf("N: %3d NumAgents: %3d  NumInteractions: %3d",
+                this.stepNum, this.getNumActors(), this.getNumInteractions())
+        $("#stats").html(str);
     }
 
     start() {
