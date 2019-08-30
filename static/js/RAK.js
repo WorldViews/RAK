@@ -1,12 +1,19 @@
 
 var tool = null;
 
+var Actor_num = 0;
 class Actor extends CanvasTool.Graphic {
-    constructor(id, x, y) {
+    constructor(x, y) {
+        var id = Actor_num++;
         super(id, x, y);
         this.vx = 0;
         this.vy = 0;
+        this.radius = 5;
         this.happiness = 0.5;
+    }
+
+    static reset() {
+        Actor_num = 0;
     }
 
     tick() {
@@ -50,6 +57,7 @@ class Interaction extends CanvasTool.Graphic {
     constructor(id, ids) {
         super(id, 0, 0);
         this.ids = ids;
+        this.lineWidth = 2;
         this.startGen = tool.stepNum;
     }
 
@@ -61,12 +69,14 @@ class Interaction extends CanvasTool.Graphic {
     }
 
     destroy() {
+        console.log("destroy interaction", this.id);
         tool.removeGraphic(this.id);
         delete tool.interactions[this.id];
     }
 
     draw(canvas, ctx) {
-        console.log("Link.draw");
+        //console.log("Link.draw ids:", this.ids);
+        //console.log("graphics:", tool.graphics);
         ctx.lineWidth = this.lineWidth;
         ctx.strokeStyle = this.strokeStyle;
         ctx.fillStyle = this.fillStyle;
@@ -76,6 +86,10 @@ class Interaction extends CanvasTool.Graphic {
             inst.ids.forEach(id2 => {
                 var a1 = tool.getGraphic(id1);
                 var a2 = tool.getGraphic(id2);
+                if (!a1 || !a2) {
+                    console.log("cant get "+id1+" and "+id2);
+                    return;
+                }
                 ctx.moveTo(a1.x, a1.y);
                 ctx.lineTo(a2.x, a2.y);                 
             })
@@ -113,7 +127,7 @@ class RAKTool extends CanvasTool {
     constructor(canvasName) {
         super(canvasName);
         this.distThresh = 50;
-        this.numAgents = 20;
+        this.numActors = 0;
         this.grid = true;
         this.mobile = true;
         tool = this;
@@ -124,7 +138,7 @@ class RAKTool extends CanvasTool {
     {
         var P = this;
         var gui = new dat.GUI();
-        gui.add(P, 'numAgents', 2, 1000);
+        gui.add(P, 'numActors', 2, 1000);
         gui.add(P, 'distThresh', 0, 200);
         gui.add(P, 'mobile');
         gui.add(P, 'grid');
@@ -136,9 +150,8 @@ class RAKTool extends CanvasTool {
     }
 
     add(x, y, id) {
-        id = id || this.numActors++;
-        var actor = new Actor(id, x, y);
-        this.actors[id] = actor;
+         var actor = new Actor(x, y);
+        this.actors[actor.id] = actor;
         this.addGraphic(actor);
     }
 
@@ -152,7 +165,7 @@ class RAKTool extends CanvasTool {
         this.links[[id1,id2]] = true;
     }
 
-    dist(id1, id2) {
+    distBetween(id1, id2) {
         var a1 = this.actors[id1];
         var a2 = this.actors[id2];
         var dx = a1.x-a2.x;
@@ -163,14 +176,18 @@ class RAKTool extends CanvasTool {
     init() {
         tool = this;
         super.init();
+        this.setView(300, 300, 800)
+        Actor.reset();
         this.stepNum = 0;
-        this.numActors = 0;
+        this.numActors = 20;
         this.numLinks = 0;
         this.actors = {};
         this.links = {};
         this.interactions = {};
         this.initPositions();
+        console.log("********* graphics:", this.graphics);
         this.initInteractions();
+        console.log("********* graphics:", this.graphics);
     }
 
     initInteractions() {
@@ -191,13 +208,13 @@ class RAKTool extends CanvasTool {
     }
 
     initGrid() {
-        var n = Math.sqrt(this.numAgents);
+        var n = Math.sqrt(this.numActors);
         n = Math.floor(n);
         var W = 600;
         var H = 600;
         var w = W / n;
         var h = H / n;
-        for (var i=0; i<this.numAgents; i++) {
+        for (var i=0; i<this.numActors; i++) {
             var j = Math.floor(i/n);
             var k = i % n;
             var x = j * w;
@@ -209,7 +226,7 @@ class RAKTool extends CanvasTool {
     initRand() {
         var W = 600;
         var H = 600;
-        for (var i=0; i<this.numAgents; i++) {
+        for (var i=0; i<this.numActors; i++) {
             var x = Math.random()*W;
             var y = Math.random()*H;
             this.add(x, y, i);
@@ -230,7 +247,7 @@ class RAKTool extends CanvasTool {
         this.links = {};
         for (var i1 in this.actors) {
             for (var i2 in this.actors) {
-                if (this.dist(i1,i2) < maxDist)
+                if (this.distBetween(i1,i2) < maxDist)
                     this.connect(i1,i2);
            }
         }
@@ -283,7 +300,7 @@ class RAKTool extends CanvasTool {
             this.actors[id].tick();
          for (var id in this.interactions)
             this.interactions[id].tick();
-        var str = sprintf("N: %3d NumAgents: %3d  NumInteractions: %3d",
+        var str = sprintf("N: %3d NumActors: %3d  NumInteractions: %3d",
                 this.stepNum, this.getNumActors(), this.getNumInteractions())
         $("#stats").html(str);
     }
