@@ -6,6 +6,8 @@ class Actor extends CanvasTool.Graphic {
     constructor(opts) {
         opts.id = opts.id || Actor_num++;
         super(opts);
+        this.fx = 0;
+        this.fy = 0;
         this.vx = 0;
         this.vy = 0;
         this.radius = 5;
@@ -33,8 +35,11 @@ class Actor extends CanvasTool.Graphic {
         }
         else {
             var s = 1;
+            var m = 2.0;
             this.vx += s*(Math.random() - 0.5);
             this.vy += s*(Math.random() - 0.5);
+            this.vx += this.fx/m;
+            this.vy += this.fy/m;
             this.x += this.vx;
             this.y += this.vy;
             this.vx *= .9;
@@ -54,7 +59,11 @@ class Actor extends CanvasTool.Graphic {
 
     draw(canvas, ctx) {
         super.draw(canvas, ctx);
-        var r = 30;
+        this.drawShell(ctx, tool.egoDistThresh/2.0);
+    }
+
+    drawShell(ctx, r)
+    {
         ctx.save();
         ctx.lineWidth = 1;
         ctx.strokeStyle = this.strokeStyle;
@@ -71,8 +80,8 @@ class RAKTool extends CanvasTool {
 //class RAKTool  {
     constructor(canvasName) {
         super(canvasName);
-        this.distThresh = 50;
-        this.distThresh2 = 250;
+        this.egoDistThresh = 40;
+        this.groupDistThresh = 250;
         this.numActors = 0;
         this.grid = true;
         this.mobile = true;
@@ -85,7 +94,8 @@ class RAKTool extends CanvasTool {
         var P = this;
         var gui = new dat.GUI();
         gui.add(P, 'numActors', 2, 1000);
-        gui.add(P, 'distThresh', 0, 200);
+        gui.add(P, 'egoDistThresh', 0, 200);
+        gui.add(P, 'groupDistThresh', 0, 200);
         gui.add(P, 'mobile');
         gui.add(P, 'grid');
         gui.add(P, 'reset');
@@ -122,7 +132,8 @@ class RAKTool extends CanvasTool {
         this.numActors = 20;
         this.numLinks = 0;
         this.actors = {};
-        this.links = {};
+        this.egoLinks = {};
+        this.groupLinks = {};
         this.initPositions();
         console.log("********* graphics:", this.graphics);
         //this.initInteractions();
@@ -169,41 +180,57 @@ class RAKTool extends CanvasTool {
             this.actors[id].adjustState();
     }
 
-    adjustPositions() {
-        for (var id in this.actors)
-            this.actors[id].adjustPosition();
+    computeForces(links) {
+        for (var id in this.actors) {
+            var a1 = this.actors[id];
+            a1.fx = 0;
+            a1.fy = 0;
+            var k = -0.1;
+            for (var i2 in this.actors) {
+                if (!links[[id,i2]])
+                    continue;
+                var a2 = this.actors[i2];
+                a1.fx = k* (a2.x - a1.x);
+                a1.fy = k* (a2.y - a1.y);
+           }
+        }
     }
 
-    computeLinks(maxDist, label) {
-        this.links = {};
+    adjustPositions() {
+        this.computeForces(this.egoLinks);
+        for (var id in this.actors) {
+           this.actors[id].adjustPosition();
+        }
+    }
+
+    computeLinks(links, distThresh) {
         for (var i1 in this.actors) {
             for (var i2 in this.actors) {
-                if (this.distBetween(i1,i2) < maxDist)
-                    this.connect(i1, i2, this.links, label);
+                if (this.distBetween(i1,i2) < distThresh)
+                    this.connect(i1, i2, links, true);
            }
         }
     }
 
     drawLinks() {
-        var ctx = this.canvas.getContext('2d');
+        this.drawLinks_(this.egoLinks, 6, 'red');
+        this.drawLinks_(this.groupLinks, 1, 'blue');
+    }
+
+    drawLinks_(links, width, strokeStyle) {
+            var ctx = this.canvas.getContext('2d');
         this.setTransform(ctx);
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = this.strokeStyle;
+        ctx.lineWidth = width;
+        ctx.strokeStyle = strokeStyle;
         //ctx.fillStyle = this.fillStyle;
         ctx.fillStyle = this.null;
         ctx.beginPath();
         for (var id1 in this.actors) {
             var a1 = this.actors[id1];
             for (var id2 in this.actors) {
-                var lab = this.links[[id1,id2]];
+                var lab = links[[id1,id2]];
                 if (!lab)
                     continue;
-                if (lab == 1) {
-                    ctx.strokeStyle = "blue";
-                }
-                else {
-                    ctx.strokeStyle = "red";
-                }
                 var a2 = this.actors[id2];
                 ctx.moveTo(a1.x, a1.y);
                 ctx.lineTo(a2.x, a2.y);
@@ -229,8 +256,10 @@ class RAKTool extends CanvasTool {
         if (this.mobile)
             this.adjustPositions();
         this.adjustStates();
-        this.computeLinks(this.distThresh, 1);
-        this.computeLinks(this.distThresh2, 2);
+        this.egoLinks = {};
+        this.computeLinks(this.egoLinks, this.egoDistThresh);
+        this.groupLinks = {};
+        this.computeLinks(this.groupLinks, this.groupDistThresh);
         this.draw();
         for (var id in this.actors)
             this.actors[id].tick();
