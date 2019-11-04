@@ -6,6 +6,7 @@ class Actor extends CanvasTool.Graphic {
     constructor(opts) {
         opts.id = opts.id || Actor_num++;
         super(opts);
+        this.tool = tool;
         this.fx = 0;
         this.fy = 0;
         this.vx = 0;
@@ -28,6 +29,7 @@ class Actor extends CanvasTool.Graphic {
     }
 
     adjustPosition() {
+        var P = this.tool;
         if (0) {
             var s = 6;
             this.x += s*(Math.random() - 0.5);
@@ -38,12 +40,12 @@ class Actor extends CanvasTool.Graphic {
             var m = 2.0;
             this.vx += s*(Math.random() - 0.5);
             this.vy += s*(Math.random() - 0.5);
-            this.vx += this.fx/m;
-            this.vy += this.fy/m;
+            this.vx += this.fx/P.mass;
+            this.vy += this.fy/P.mass;
             this.x += this.vx;
             this.y += this.vy;
-            this.vx *= .9;
-            this.vy *= .9;
+            //this.vx *= (1 - P.drag);
+            //this.vy *= (1 - P.drag);
         }
     }
 
@@ -81,7 +83,12 @@ class RAKTool extends CanvasTool {
     constructor(canvasName) {
         super(canvasName);
         this.egoDistThresh = 40;
-        this.groupDistThresh = 250;
+        this.groupDistThresh = 0;
+        this.egoK = 1.0;
+        this.groupK = 0.0;
+        this.mass = 2;
+        this.drag1 = 0.01;
+        this.drag2 = 0.01;
         this.numActors = 0;
         this.grid = true;
         this.mobile = true;
@@ -96,6 +103,11 @@ class RAKTool extends CanvasTool {
         gui.add(P, 'numActors', 2, 1000);
         gui.add(P, 'egoDistThresh', 0, 200);
         gui.add(P, 'groupDistThresh', 0, 200);
+        gui.add(P, 'egoK', 0, 2);
+        gui.add(P, 'groupK', 0, 2);
+        gui.add(P, 'drag1', 0, 1);
+        gui.add(P, 'drag2', 0, 1);
+        gui.add(P, 'mass', 0, 4);
         gui.add(P, 'mobile');
         gui.add(P, 'grid');
         gui.add(P, 'reset');
@@ -111,13 +123,15 @@ class RAKTool extends CanvasTool {
         this.addGraphic(actor);
     }
 
-    connect(id1, id2, links, label) {
-        links[[id1,id2]] = label;
+    connect(id1, id2, links, d) {
+        links[[id1,id2]] = d;
     }
 
-    distBetween(id1, id2) {
-        var a1 = this.actors[id1];
-        var a2 = this.actors[id2];
+    distBetween(a1, a2) {
+        if (typeof a1 === 'string')
+            a1 = this.actors[a1];
+        if (typeof a2 === 'string')
+            a2 = this.actors[a2];
         var dx = a1.x-a2.x;
         var dy = a1.y-a2.y;
         return Math.sqrt(dx*dx + dy*dy);
@@ -180,24 +194,74 @@ class RAKTool extends CanvasTool {
             this.actors[id].adjustState();
     }
 
-    computeForces(links) {
+    computeBoundaryForces(links) {
+        var xmin = 0;
+        var xmax = 600;
+        var ymin = 0;
+        var ymax = 600;
+        var f = 4;
+        for (var id in this.actors) {
+            var a1 = this.actors[id];
+            if (a1.x < xmin)
+                a1.fx += f;
+            if (a1.x > xmax)
+                a1.fx -= f;
+            if (a1.y < ymin)
+                a1.fy += f;
+            if (a1.y > ymax)
+                a1.fy -= f;
+        }
+    }
+
+    computeDragForces(links) {
+        var P = this;
+        for (var id in this.actors) {
+            var a = this.actors[id];
+            var v = Math.sqrt(a.vx*a.vx + a.vy*a.vy);
+            a.fx += -P.drag1*a.vx
+            a.fy += -P.drag1*a.vy
+            a.fx += -v*P.drag2*a.vx
+            a.fy += -v*P.drag2*a.vy
+        }
+    }
+
+    clearForces() {
         for (var id in this.actors) {
             var a1 = this.actors[id];
             a1.fx = 0;
             a1.fy = 0;
-            var k = -0.1;
+        }
+    }
+
+    computeForces(links, k) {
+        for (var id in this.actors) {
+            var a1 = this.actors[id];
             for (var i2 in this.actors) {
-                if (!links[[id,i2]])
+                var d0 = links[[id,i2]];
+                if (d0 == null)
                     continue;
                 var a2 = this.actors[i2];
-                a1.fx = k* (a2.x - a1.x);
-                a1.fy = k* (a2.y - a1.y);
+                var d = this.distBetween(a1,a2);
+                var dd = (d - d0)
+                //dd = dd < 0 ? -1 : 1;
+                var nx = (a2.x - a1.x)/d;
+                var ny = (a2.y - a1.y)/d;
+                var fx = k*dd*nx;
+                var fy = k*dd*ny;
+                a1.fx += fx;
+                a1.fy += fy;
+                console.log(sprintf("d0: %6.1f d: %6.1f dd: %6.3f k: %6.3f fx: %8.3f fy: %8.3f",
+                                    d0, d, dd, k, fx, fy))
            }
         }
     }
 
     adjustPositions() {
-        this.computeForces(this.egoLinks);
+        this.clearForces();
+        this.computeForces(this.egoLinks, this.egoK);
+        this.computeForces(this.groupLinks, this.groupK);
+        this.computeBoundaryForces();
+        this.computeDragForces();
         for (var id in this.actors) {
            this.actors[id].adjustPosition();
         }
@@ -206,8 +270,11 @@ class RAKTool extends CanvasTool {
     computeLinks(links, distThresh) {
         for (var i1 in this.actors) {
             for (var i2 in this.actors) {
-                if (this.distBetween(i1,i2) < distThresh)
-                    this.connect(i1, i2, links, true);
+                if (i1 == i2)
+                    continue;
+                var d = this.distBetween(i1,i2);
+                if (d < distThresh)
+                    this.connect(i1, i2, links, distThresh);
            }
         }
     }
